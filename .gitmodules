@@ -1,0 +1,6 @@
+[submodule "auth"]
+	path = auth
+	url = git@github.com:guille1988/auth.git
+[submodule "email"]
+	path = email
+	url = git@github.com:guille1988/email.git

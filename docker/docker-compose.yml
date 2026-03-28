@@ -1,0 +1,203 @@
+services:
+  auth:
+    build:
+      context: ..
+      dockerfile: docker/auth/Dockerfile
+    image: auth:latest
+    container_name: auth
+    volumes:
+      - ../auth:/auth
+    environment:
+      APP_NAME: ${AUTH_APP_NAME}
+      APP_ENV: ${AUTH_APP_ENV}
+      APP_HOST: ${AUTH_APP_HOST}
+      APP_PORT: ${AUTH_APP_PORT}
+      DB_DRIVER: ${AUTH_DB_DRIVER}
+      DB_HOST: ${AUTH_DB_HOST}
+      DB_PORT: ${AUTH_DB_PORT}
+      DB_DATABASE: ${AUTH_DB_DATABASE}
+      DB_USERNAME: ${AUTH_DB_USERNAME}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      DB_LOCAL_MAX_IDLE_CONNECTIONS: ${AUTH_DB_MAX_IDLE_CONNECTIONS}
+      DB_LOCAL_MAX_OPEN_CONNECTIONS: ${AUTH_DB_MAX_OPEN_CONNECTIONS}
+      LOG_DRIVER: ${AUTH_LOG_DRIVER}
+      LOG_PATH: ${AUTH_LOG_PATH}
+      LOG_LEVEL: ${AUTH_LOG_LEVEL}
+      REDIS_HOST: ${AUTH_REDIS_HOST}
+      REDIS_PORT: ${AUTH_REDIS_PORT}
+      REDIS_PASSWORD: ${AUTH_REDIS_PASSWORD}
+      REDIS_DATABASE: ${AUTH_REDIS_DATABASE}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      AUTH_ACCESS_TOKEN_EXPIRE: ${AUTH_ACCESS_TOKEN_EXPIRE}
+      AUTH_REFRESH_TOKEN_EXPIRE: ${AUTH_REFRESH_TOKEN_EXPIRE}
+      AUTH_EMAIL_VERIFICATION_EXPIRE: ${AUTH_EMAIL_VERIFICATION_EXPIRE}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    working_dir: /auth
+    depends_on:
+      mysql_auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    ports:
+      - "${AUTH_APP_PORT}:${AUTH_APP_PORT}"
+    networks:
+      - app-network
+
+  email:
+    build:
+      context: ..
+      dockerfile: docker/email/Dockerfile
+    image: email:latest
+    container_name: email
+    volumes:
+      - ../email:/email
+    environment:
+      APP_NAME: ${EMAIL_APP_NAME}
+      APP_ENV: ${EMAIL_APP_ENV}
+      APP_HOST: ${EMAIL_APP_HOST}
+      APP_PORT: ${EMAIL_APP_PORT}
+      DB_DRIVER: ${EMAIL_DB_DRIVER}
+      DB_HOST: ${EMAIL_DB_HOST}
+      DB_PORT: ${EMAIL_DB_PORT}
+      DB_DATABASE: ${EMAIL_DB_DATABASE}
+      DB_USERNAME: ${EMAIL_DB_USERNAME}
+      DB_PASSWORD: ${EMAIL_DB_PASSWORD}
+      DB_LOCAL_MAX_IDLE_CONNECTIONS: ${EMAIL_DB_MAX_IDLE_CONNECTIONS}
+      DB_LOCAL_MAX_OPEN_CONNECTIONS: ${EMAIL_DB_MAX_OPEN_CONNECTIONS}
+      LOG_DRIVER: ${EMAIL_LOG_DRIVER}
+      LOG_PATH: ${EMAIL_LOG_PATH}
+      LOG_LEVEL: ${EMAIL_LOG_LEVEL}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      MAIL_HOST: ${EMAIL_MAIL_HOST}
+      MAIL_PORT: ${EMAIL_MAIL_PORT}
+      MAIL_USER: ${EMAIL_MAIL_USER}
+      MAIL_PASSWORD: ${EMAIL_MAIL_PASSWORD}
+    working_dir: /email
+    depends_on:
+      mysql_email:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    ports:
+      - "${EMAIL_APP_PORT}:${EMAIL_APP_PORT}"
+    networks:
+      - app-network
+
+  mysql_auth:
+    image: mysql:8.0
+    container_name: mysql_auth
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${AUTH_DB_DATABASE}
+      MYSQL_USER: ${AUTH_DB_USERNAME}
+      MYSQL_PASSWORD: ${AUTH_DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_auth_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+    networks:
+      - app-network
+
+  mysql_email:
+    image: mysql:8.0
+    container_name: mysql_email
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${EMAIL_DB_DATABASE}
+      MYSQL_USER: ${EMAIL_DB_USERNAME}
+      MYSQL_PASSWORD: ${EMAIL_DB_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_email_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+    networks:
+      - app-network
+
+  redis:
+    image: redis:alpine
+    container_name: redis_auth
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_auth_data:/data
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    networks:
+      - app-network
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - app-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail/promtail-config.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_auth_data:
+  mysql_email_data:
+  redis_auth_data:

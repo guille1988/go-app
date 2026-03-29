@@ -55,6 +55,7 @@ services:
     container_name: email
     volumes:
       - ../email:/email
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       APP_NAME: ${EMAIL_APP_NAME}
       APP_ENV: ${EMAIL_APP_ENV}

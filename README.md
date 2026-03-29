@@ -1,127 +1,97 @@
-### Authentication Microservice in Go
+# Go-App Microservices Project
 
-This is a robust and scalable authentication microservice built with **Go**, following clean architecture principles. It provides user registration, login, token refreshing, and user management functionalities, using **JWT** for secure authentication and **Redis** for token management/blacklisting.
-
----
-
-### 🚀 Features
-
-*   **User Authentication**: Secure Login and Registration using bcrypt for password hashing.
-*   **JWT Management**: Issues Access and Refresh tokens.
-*   **Token Revocation**: Logout functionality that blacklists tokens in Redis.
-*   **User Management**: Full CRUD operations for user profiles (protected by auth middleware).
-*   **Clean Architecture**: Separation of concerns into domain, infrastructure, and application layers.
-*   **Containerized**: Fully Dockerized for easy deployment and local development.
-*   **Database Migrations & Seeding**: Built-in tools for managing database schema and initial data.
-*   **Testing Suite**: Includes both unit and integration tests using Testcontainers.
+A modern, scalable microservices architecture built with **Go 1.25**, focusing on clean code, asynchronous communication, and containerized deployments.
 
 ---
 
-### 🛠 Tech Stack
+### 🧱 Architecture Overview
 
-*   **Language**: Go 1.25+
-*   **Web Framework**: [Gin Gonic](https://github.com/gin-gonic/gin)
-*   **ORM**: [GORM](https://gorm.io/) (supports MySQL, PostgreSQL, SQLite)
-*   **Cache**: [Redis](https://redis.io/)
-*   **Authentication**: [JWT (golang-jwt)](https://github.com/golang-jwt/jwt)
-*   **Migrations**: [golang-migrate](https://github.com/golang-migrate/migrate)
-*   **Testing**: [Testify](https://github.com/stretchr/testify) & [Testcontainers](https://testcontainers.com/)
+This project is a distributed system consisting of several specialized microservices that communicate via REST APIs and asynchronous messaging (RabbitMQ).
 
----
-
-### 📋 Prerequisites
-
-*   [Docker](https://www.docker.com/) and Docker Compose.
-*   [Go](https://golang.org/) (optional, for local development outside Docker).
-*   `make` (utility to run Makefile commands).
+*   **[Auth Microservice](./auth)**: Manages user authentication, JWT issuance, and user profiles. Uses Redis for token management.
+*   **[Email Microservice](./email)**: Handles email dispatching. Consumes messages from RabbitMQ to send transactional emails asynchronously.
+*   **Message Broker**: RabbitMQ serves as the central hub for inter-service communication.
+*   **Database**: Each microservice manages its own database (MySQL/PostgreSQL/SQLite) ensuring data isolation.
 
 ---
 
-### ⚙️ Getting Started
+### 🚀 Quick Start
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository-url>
-    cd auth
-    ```
+#### Prerequisites
+- [Docker](https://www.docker.com/) & Docker Compose.
+- `make` utility.
 
-2.  **Initialize the project**:
-    This command will copy the `.env.example`, start the Docker containers, run migrations, and execute tests.
-    ```bash
-    make init
-    ```
+#### 1. Start the entire system
+From the root directory, run:
+```bash
+make up
+```
+This will start MySQL, Redis, RabbitMQ, Promtail, and all microservices defined in the `docker-compose.yml`.
 
-3.  **Run the application (Development mode)**:
-    ```bash
-    make run-dev
-    ```
+#### 2. Run Database Migrations
+Initialize schemas for all services:
+```bash
+make migrate
+```
 
----
-
-### 🛠 Development Commands
-
-The project includes a `Makefile` to simplify common tasks:
-
- Command | Description |
- :--- | :--- |
- `make up` | Start infrastructure (MySQL, Redis, etc.) in background. |
- `make down` | Stop all containers. |
- `make migrate` | Run database migrations. |
- `make migrate-fresh` | Drop all tables and rerun migrations. |
- `make seed` | Populate the database with dummy data. |
- `make test` | Run all integration and unit tests. |
- `make run-prod` | Build and run the service in production-like mode. |
-
----
-
-### 📡 API Endpoints
-
-#### Authentication (`/api/auth`)
-*   `POST /register`: Register a new user.
-*   `POST /login`: Authenticate and receive JWT tokens.
-*   `POST /refresh`: Get a new access token using a refresh token.
-*   `DELETE /logout`: Revoke current tokens.
-
-#### Users (`/api/users`) - *Requires Authorization Header*
-*   `GET /`: List all users.
-*   `POST /`: Create a user manually.
-*   `GET /:uuid`: Get user details by UUID.
-*   `PATCH /:uuid`: Update user information.
-*   `DELETE /:uuid`: Remove a user.
-
----
-
-### 📂 Project Structure
-
-```text
-├── cmd/                # Entry points (API, Migrations, Seeder)
-├── internal/
-│   ├── bootstrap/      # App initialization logic
-│   ├── domain/         # Business logic (Auth, User modules)
-│   │   └── auth/       # Auth actions, handlers, services
-│   │   └── user/       # User entity, repository, handlers
-│   ├── infrastructure/ # Frameworks & Drivers (DB, Redis, Config, Middlewares)
-├── tests/              # Integration and Unit tests
-├── Dockerfile          # Production build configuration
-└── docker-compose.yaml # Local development environment
+#### 3. Seed initial data (Optional)
+```bash
+make seed
 ```
 
 ---
 
-### 🔐 Environment Variables
+### 🛠 Centralized Management (Makefile)
 
-Key configurations found in `.env`:
-*   `APP_PORT`: Server port (default: 8080).
-*   `DB_DRIVER`: `mysql`, `postgres`, or `sqlite`.
-*   `AUTH_JWT_SECRET`: Secret key for signing tokens.
-*   `AUTH_ACCESS_TOKEN_EXPIRE`: Access token TTL in minutes.
-*   `REDIS_HOST`: Redis connection host.
+The project includes a root-level `Makefile` to manage all microservices at once:
+
+| Command | Description |
+| :--- | :--- |
+| `make up` | Start all containers in detached mode. |
+| `make down` | Stop and remove all containers. |
+| `make build` | Rebuild all Docker images. |
+| `make test` | Execute tests for ALL microservices. |
+| `make migrate` | Run migrations for ALL microservices. |
+| `make compile-all` | Compile binaries for all services and their CLI tools. |
+| `make clean` | Remove containers and their associated volumes. |
 
 ---
 
-### 🧪 Testing
+### 📁 Project Structure
 
-Run tests using Docker to ensure a clean environment (uses Testcontainers for DB/Redis):
+```text
+.
+├── auth/               # Auth microservice source code
+├── email/              # Email microservice source code
+├── docker/             # Dockerfiles and infrastructure configuration
+│   ├── auth/
+│   ├── email/
+│   └── docker-compose.yml
+└── Makefile            # Main orchestration file
+```
+
+---
+
+### 📡 System Communication Flow
+
+1.  **User Registration**: Client hits the `Auth` API.
+2.  **User Persisted**: `Auth` service saves user data to its database.
+3.  **Event Published**: `Auth` service publishes a `WelcomeEmail` message to RabbitMQ.
+4.  **Event Consumed**: `Email` service consumes the message from the queue.
+5.  **Email Sent**: `Email` service renders the template and sends it via SMTP.
+
+---
+
+### 🧪 Testing Strategy
+
+Each service contains its own testing suite. You can run all of them from the root:
 ```bash
 make test
 ```
+The integration tests use **Testcontainers**, ensuring that services are tested against real instances of MySQL, Redis, and RabbitMQ.
+
+---
+
+### 📈 Monitoring & Logs
+
+The system includes **Promtail** for log aggregation, designed to work within a Grafana/Loki stack for centralized observability.

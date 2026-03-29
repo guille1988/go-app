@@ -49,8 +49,6 @@ migrate-fresh:
 seed:
 	@echo "Running seeds for auth microservice..."
 	docker exec auth go run cmd/seed/main.go
-	@echo "Running seeds for email microservice..."
-	docker exec email go run cmd/seed/main.go
 
 clean:
 	@echo "Cleaning environment..."
@@ -68,7 +66,5 @@ compile-all:
 	docker exec auth go build -o bin/migrate cmd/migrate/main.go
 	docker exec auth go build -o bin/seed cmd/seed/main.go
 	@echo "Compiling all email microservice (api, consumer, migrate, seed)..."
-	docker exec email go build -o bin/api cmd/api/main.go
 	docker exec email go build -o bin/consumer cmd/consumer/main.go
 	docker exec email go build -o bin/migrate cmd/migrate/main.go
-	docker exec email go build -o bin/seed cmd/seed/main.go

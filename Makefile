@@ -35,6 +35,12 @@ migrate:
 	@echo "Running migrations for email..."
 	docker exec -it email go run cmd/migrate/main.go
 
+migrate-fresh:
+	@echo "Running fresh migrations for auth..."
+	docker exec -it auth go run cmd/migrate/main.go -fresh
+	@echo "Running fresh migrations for email..."
+	docker exec -it email go run cmd/migrate/main.go -fresh
+
 seed:
 	@echo "Running seeds for auth..."
 	docker exec -it auth go run cmd/seed/main.go

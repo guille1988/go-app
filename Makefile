@@ -1,6 +1,6 @@
 DOCKER_COMPOSE = docker-compose -f docker/docker-compose.yml
 
-.PHONY: up down restart build ps logs test migrate migrate-fresh seed clean help compile compile-all
+.PHONY: up down restart build ps logs test migrate migrate-fresh seed clean help compile compile-all update
 
 help:
 	@echo "Available commands:"
@@ -51,6 +51,14 @@ migrate-fresh:
 seed:
 	@echo "Running seeds for auth microservice..."
 	docker exec auth go run cmd/seed/main.go
+
+update:
+	@echo "Running go mod tidy on auth microservice..."
+	docker exec auth go mod tidy
+	@echo "Running go mod tidy on email microservice..."
+	docker exec email go mod tidy
+	@echo "Running go mod tidy on broadcasting microservice..."
+	docker exec broadcasting go mod tidy
 
 clean:
 	@echo "Cleaning environment..."

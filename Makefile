@@ -33,6 +33,8 @@ test:
 	docker exec auth go test ./tests/...
 	@echo "Executing tests on email microservice..."
 	docker exec email go test ./tests/...
+	@echo "Executing tests on broadcasting microservice..."
+	docker exec broadcasting go test ./tests/...
 
 migrate:
 	@echo "Running migrations for auth microservice..."
@@ -59,12 +61,16 @@ compile:
 	docker exec auth go build -o bin/api cmd/api/main.go
 	@echo "Compiling consumer in email microservice..."
 	docker exec email go build -o bin/consumer cmd/consumer/main.go
+	@echo "Compiling consumer in broadcasting microservice..."
+	docker exec broadcasting go build -o bin/consumer cmd/consumer/main.go
 
 compile-all:
 	@echo "Compiling all auth microservice (api, migrate, seed)..."
 	docker exec auth go build -o bin/api cmd/api/main.go
 	docker exec auth go build -o bin/migrate cmd/migrate/main.go
 	docker exec auth go build -o bin/seed cmd/seed/main.go
-	@echo "Compiling all email microservice (api, consumer, migrate, seed)..."
+	@echo "Compiling all email microservice (consumer, migrate)..."
 	docker exec email go build -o bin/consumer cmd/consumer/main.go
 	docker exec email go build -o bin/migrate cmd/migrate/main.go
+	@echo "Compiling broadcasting microservice (consumer)..."
+	docker exec broadcasting go build -o bin/consumer cmd/consumer/main.go

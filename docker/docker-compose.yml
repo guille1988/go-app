@@ -87,6 +87,34 @@ services:
     networks:
       - app-network
 
+  broadcasting:
+    build:
+      context: ..
+      dockerfile: docker/broadcasting/Dockerfile
+    image: broadcasting:latest
+    container_name: broadcasting
+    volumes:
+      - ../broadcasting:/broadcasting
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      APP_NAME: ${BROADCASTING_APP_NAME}
+      APP_ENV: ${BROADCASTING_APP_ENV}
+      LOG_DRIVER: ${BROADCASTING_LOG_DRIVER}
+      LOG_PATH: ${BROADCASTING_LOG_PATH}
+      LOG_LEVEL: ${BROADCASTING_LOG_LEVEL}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    working_dir: /broadcasting
+    depends_on:
+      rabbitmq:
+        condition: service_started
+    ports:
+      - "${BROADCASTING_APP_PORT}:8080"
+    networks:
+      - app-network
+
   mysql_auth:
     image: mysql:8.0
     container_name: mysql_auth

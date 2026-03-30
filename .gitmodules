@@ -4,3 +4,6 @@
 [submodule "email"]
 	path = email
 	url = git@github.com:guille1988/email.git
+[submodule "broadcasting"]
+	path = broadcasting
+	url = git@github.com:guille1988/broadcasting.git

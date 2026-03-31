@@ -41,7 +41,7 @@ services:
       mysql_auth:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${AUTH_APP_PORT}:${AUTH_APP_PORT}"
     networks:
@@ -83,7 +83,7 @@ services:
       mysql_email:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - app-network
 
@@ -109,7 +109,7 @@ services:
     working_dir: /broadcasting
     depends_on:
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${BROADCASTING_APP_PORT}:8080"
     networks:
@@ -176,6 +176,10 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      retries: 10
     networks:
       - app-network
 

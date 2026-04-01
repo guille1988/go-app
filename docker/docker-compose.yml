@@ -1,4 +1,24 @@
 services:
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    ports:
+      - "80:80"
+      - "${TRAEFIK_DASHBOARD_PORT}:8080"
+    volumes:
+      - ${HOME}/.docker/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app-network
+
   auth:
     build:
       context: ..
@@ -42,8 +62,14 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    ports:
-      - "${AUTH_APP_PORT}:${AUTH_APP_PORT}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.forward-auth.forwardauth.address=http://auth:${AUTH_APP_PORT}/api/auth/validate"
+      - "traefik.http.middlewares.forward-auth.forwardauth.authResponseHeaders=X-User-UUID"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.routers.auth.service=auth"
+      - "traefik.http.services.auth.loadbalancer.server.port=${AUTH_APP_PORT}"
     networks:
       - app-network
 
@@ -110,8 +136,16 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    ports:
-      - "${BROADCASTING_APP_PORT}:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.forward-auth.forwardauth.address=http://auth:${AUTH_APP_PORT}/api/auth/validate"
+      - "traefik.http.middlewares.forward-auth.forwardauth.authResponseHeaders=X-User-UUID"
+      - "traefik.http.routers.broadcasting.rule=PathPrefix(`/ws`)"
+      - "traefik.http.routers.broadcasting.entrypoints=web"
+      - "traefik.http.routers.broadcasting.middlewares=forward-auth"
+      - "traefik.http.routers.broadcasting.service=broadcasting"
+      - "traefik.http.services.broadcasting.loadbalancer.server.port=8080"
+      - "traefik.http.services.broadcasting.loadbalancer.passHostHeader=true"
     networks:
       - app-network
 

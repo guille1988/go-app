@@ -54,7 +54,7 @@ seed:
 
 migrate-seed: migrate-fresh seed
 
-init: up migrate-seed test
+init: up update migrate-seed test
 
 update:
 	@echo "Running go mod tidy on auth microservice..."

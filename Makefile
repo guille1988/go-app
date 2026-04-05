@@ -1,4 +1,4 @@
-DOCKER_COMPOSE = docker-compose -f docker/docker-compose.yml
+DOCKER_COMPOSE = docker-compose -f infrastructure/local/docker-compose.yml
 
 .PHONY: up down restart build ps logs test migrate migrate-fresh seed migrate-seed init clean help compile compile-all update
 

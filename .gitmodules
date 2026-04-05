@@ -1,9 +1,9 @@
 [submodule "auth"]
-	path = auth
+	path = microservices/auth
 	url = git@github.com:guille1988/auth.git
 [submodule "email"]
-	path = email
+	path = microservices/email
 	url = git@github.com:guille1988/email.git
 [submodule "broadcasting"]
-	path = broadcasting
+	path = microservices/broadcasting
 	url = git@github.com:guille1988/broadcasting.git

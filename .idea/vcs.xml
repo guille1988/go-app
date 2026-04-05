@@ -2,8 +2,11 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/auth" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/broadcasting" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/email" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/microservices/auth" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/microservices/auth/internal/shared" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/microservices/broadcasting" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/microservices/broadcasting/internal/shared" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/microservices/email" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/microservices/email/internal/shared" vcs="Git" />
   </component>
 </project>

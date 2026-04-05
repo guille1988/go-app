@@ -21,12 +21,12 @@ services:
 
   auth:
     build:
-      context: ..
-      dockerfile: docker/auth/Dockerfile
+      context: ../..
+      dockerfile: infrastructure/local/auth/Dockerfile
     image: auth:latest
     container_name: auth
     volumes:
-      - ../auth:/auth
+      - ../../microservices/auth:/auth
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       APP_NAME: ${AUTH_APP_NAME}
@@ -75,12 +75,12 @@ services:
 
   email:
     build:
-      context: ..
-      dockerfile: docker/email/Dockerfile
+      context: ../..
+      dockerfile: infrastructure/local/email/Dockerfile
     image: email:latest
     container_name: email
     volumes:
-      - ../email:/email
+      - ../../microservices/email:/email
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       APP_NAME: ${EMAIL_APP_NAME}
@@ -115,12 +115,12 @@ services:
 
   broadcasting:
     build:
-      context: ..
-      dockerfile: docker/broadcasting/Dockerfile
+      context: ../..
+      dockerfile: infrastructure/local/broadcasting/Dockerfile
     image: broadcasting:latest
     container_name: broadcasting
     volumes:
-      - ../broadcasting:/broadcasting
+      - ../../microservices/broadcasting:/broadcasting
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       APP_NAME: ${BROADCASTING_APP_NAME}

@@ -6,6 +6,7 @@ RUN go install github.com/air-verse/air@latest
 WORKDIR /email
 
 COPY email/go.mod email/go.sum ./
+COPY email/internal/shared/ ./internal/shared/
 RUN go mod download
 
 COPY email/ .

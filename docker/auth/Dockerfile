@@ -6,6 +6,7 @@ RUN go install github.com/air-verse/air@latest
 WORKDIR /auth
 
 COPY auth/go.mod auth/go.sum ./
+COPY auth/internal/shared/ ./internal/shared/
 RUN go mod download
 
 COPY auth/ .

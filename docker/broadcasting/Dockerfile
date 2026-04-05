@@ -6,6 +6,7 @@ RUN go install github.com/air-verse/air@latest
 WORKDIR /broadcasting
 
 COPY broadcasting/go.mod broadcasting/go.sum ./
+COPY broadcasting/internal/shared/ ./internal/shared/
 RUN go mod download
 
 COPY broadcasting/ .

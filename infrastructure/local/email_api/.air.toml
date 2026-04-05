@@ -1,0 +1,45 @@
+root = "."
+test_dir = "tests"
+tmp_dir = "bin"
+
+[build]
+  args_bin = []
+  bin = "./bin/api"
+  cmd = "go build -o ./bin/api ./cmd/api/main.go"
+  delay = 1000
+  exclude_dir = ["bin", "tests", "vendor"]
+  exclude_file = []
+  exclude_regex = ["_test.go"]
+  exclude_unchanged = false
+  follow_symlink = false
+  full_bin = ""
+  include_ext = ["go", "tpl", "tmpl", "html", "yaml", "yml"]
+  include_file = []
+  kill_delay = "0s"
+  log = "build-errors.log"
+  poll = false
+  poll_interval = 0
+  post_cmd = []
+  pre_cmd = []
+  rerun = false
+  rerun_delay = 500
+  send_interrupt = false
+  stop_on_error = true
+
+[log]
+  main_only = false
+  time = true
+
+[color]
+  app = ""
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[misc]
+  clean_on_exit = false
+
+[screen]
+  clear_on_rebuild = false
+  keep_scroll = true

@@ -158,6 +158,8 @@ services:
     environment:
       APP_NAME: ${BROADCASTING_APP_NAME}
       APP_ENV: ${BROADCASTING_APP_ENV}
+      APP_HOST: ${BROADCASTING_APP_HOST}
+      APP_PORT: ${BROADCASTING_APP_PORT}
       LOG_DRIVER: ${BROADCASTING_LOG_DRIVER}
       LOG_PATH: ${BROADCASTING_LOG_PATH}
       LOG_LEVEL: ${BROADCASTING_LOG_LEVEL}
@@ -173,11 +175,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.middlewares.forward-auth.forwardauth.address=http://auth:${AUTH_APP_PORT}/api/auth/validate"
       - "traefik.http.middlewares.forward-auth.forwardauth.authResponseHeaders=X-User-UUID"
-      - "traefik.http.routers.broadcasting.rule=PathPrefix(`/ws`)"
+      - "traefik.http.routers.broadcasting.rule=PathPrefix(`/api/ws`)"
       - "traefik.http.routers.broadcasting.entrypoints=web"
       - "traefik.http.routers.broadcasting.middlewares=forward-auth"
       - "traefik.http.routers.broadcasting.service=broadcasting"
-      - "traefik.http.services.broadcasting.loadbalancer.server.port=8080"
+      - "traefik.http.services.broadcasting.loadbalancer.server.port=${BROADCASTING_APP_PORT}"
       - "traefik.http.services.broadcasting.loadbalancer.passHostHeader=true"
     networks:
       - app-network

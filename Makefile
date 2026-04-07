@@ -1,34 +1,48 @@
-DOCKER_COMPOSE = docker-compose -f infrastructure/local/docker-compose.yml
+DOCKER_COMPOSE   = docker-compose -f infrastructure/local/docker-compose.yml
+KUBECTL          = kubectl -n go-app
+MINIKUBE_PROFILE = go-app
+K8S_DIR          = infrastructure/production/k8s
 
-.PHONY: up down restart build ps logs test migrate migrate-fresh seed migrate-seed init clean help compile compile-all update
+.PHONY: \
+	help \
+	local-up local-down local-restart local-build local-ps local-logs \
+	local-test local-migrate local-migrate-fresh local-seed local-migrate-seed \
+	local-init local-update local-compile local-compile-all \
+	up down restart build ps logs test migrate migrate-fresh seed migrate-seed \
+	init update clean compile compile-all \
+	production-setup production-build production-up production-down production-restart \
+	production-ps production-logs production-test production-migrate \
+    production-init production-url
 
 help:
 	@echo "Available commands:"
 	@grep -E '^##' $(MAKEFILE_LIST) | sed -e 's/## //g' | column -t -s ':' |  sed -e 's/^/ /'
 
-up:
-	@echo "Starting containers..."
+# ── LOCAL (docker-compose) ────────────────────────────────────────────────────
+
+local-up:
+	@echo "Starting local containers..."
 	$(DOCKER_COMPOSE) up -d
 
-down:
-	@echo "Stopping containers..."
-	$(DOCKER_COMPOSE) down
+local-down:
+	@echo "Removing local containers..."
+	$(DOCKER_COMPOSE) down -v --remove-orphans
 
-restart: down up
+local-restart: local-down local-up
 
-build:
-	@echo "Building Docker images..."
+local-build:
+	@echo "Building local Docker images..."
 	$(DOCKER_COMPOSE) build
 
-ps:
+local-ps:
 	@echo "Checking container status..."
 	$(DOCKER_COMPOSE) ps
 
-logs:
+local-logs:
 	@echo "Viewing logs..."
 	$(DOCKER_COMPOSE) logs -f
 
-test:
+local-test:
 	@echo "Executing tests on auth microservice..."
 	docker exec auth go test ./tests/...
 	@echo "Executing tests on email microservice..."
@@ -36,27 +50,27 @@ test:
 	@echo "Executing tests on broadcasting microservice..."
 	docker exec broadcasting go test ./tests/...
 
-migrate:
+local-migrate:
 	@echo "Running migrations for auth microservice..."
 	docker exec auth go run cmd/migrate/main.go
 	@echo "Running migrations for email microservice..."
 	docker exec email go run cmd/migrate/main.go
 
-migrate-fresh:
+local-migrate-fresh:
 	@echo "Running fresh migrations for auth..."
 	docker exec auth go run cmd/migrate/main.go -fresh
 	@echo "Running fresh migrations for email..."
 	docker exec email go run cmd/migrate/main.go -fresh
 
-seed:
+local-seed:
 	@echo "Running seeds for auth microservice..."
 	docker exec auth go run cmd/seed/main.go
 
-migrate-seed: migrate-fresh seed
+local-migrate-seed: local-migrate-fresh local-seed
 
-init: up update migrate-seed test
+local-init: local-up local-update local-migrate-seed local-test
 
-update:
+local-update:
 	@echo "Running go mod tidy on auth microservice..."
 	docker exec auth go mod tidy
 	@echo "Running go mod tidy on email microservice..."
@@ -64,11 +78,7 @@ update:
 	@echo "Running go mod tidy on broadcasting microservice..."
 	docker exec broadcasting go mod tidy
 
-clean:
-	@echo "Cleaning environment..."
-	$(DOCKER_COMPOSE) down -v --remove-orphans
-
-compile:
+local-compile:
 	@echo "Compiling API in auth microservice..."
 	docker exec auth go build -o bin/api cmd/api/main.go
 	@echo "Compiling consumer in email microservice..."
@@ -76,7 +86,7 @@ compile:
 	@echo "Compiling consumer in broadcasting microservice..."
 	docker exec broadcasting go build -o bin/consumer cmd/consumer/main.go
 
-compile-all:
+local-compile-all:
 	@echo "Compiling all auth microservice (api, migrate, seed)..."
 	docker exec auth go build -o bin/api cmd/api/main.go
 	docker exec auth go build -o bin/migrate cmd/migrate/main.go
@@ -86,3 +96,87 @@ compile-all:
 	docker exec email go build -o bin/migrate cmd/migrate/main.go
 	@echo "Compiling broadcasting microservice (consumer)..."
 	docker exec broadcasting go build -o bin/consumer cmd/consumer/main.go
+
+# ── ALIASES (backwards-compatible originals) ─────────────────────────────────
+
+up: local-up
+down: local-down
+restart: local-restart
+build: local-build
+ps: local-ps
+logs: local-logs
+test: local-test
+migrate: local-migrate
+migrate-fresh: local-migrate-fresh
+seed: local-seed
+migrate-seed: local-migrate-seed
+init: local-init
+update: local-update
+compile: local-compile
+compile-all: local-compile-all
+
+# ── PRODUCTION (minikube / kubectl) ───────────────────────────────────────────
+
+production-setup:
+	@echo "Starting minikube..."
+	minikube start --profile=$(MINIKUBE_PROFILE) --driver=docker
+	@echo "Enabling NGINX ingress addon..."
+	minikube addons enable ingress --profile=$(MINIKUBE_PROFILE)
+	@echo "Waiting for ingress controller..."
+	kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=120s
+
+production-build:
+	@echo "Building production images inside minikube daemon..."
+	minikube image build --profile=$(MINIKUBE_PROFILE) -t auth:latest -f infrastructure/production/auth/Dockerfile .
+	minikube image build --profile=$(MINIKUBE_PROFILE) -t email:latest -f infrastructure/production/email/Dockerfile .
+	minikube image build --profile=$(MINIKUBE_PROFILE) -t broadcasting:latest -f infrastructure/production/broadcasting/Dockerfile .
+
+production-up:
+	@echo "Deploying to minikube..."
+	kubectl apply -f $(K8S_DIR)/namespace.yaml
+	$(KUBECTL) apply -f $(K8S_DIR)/secrets/
+	$(KUBECTL) apply -f $(K8S_DIR)/infra/
+	$(KUBECTL) apply -f $(K8S_DIR)/services/
+	@echo "Waiting for pods to be ready..."
+	$(KUBECTL) wait --for=condition=ready pod --all --timeout=180s
+
+production-down:
+	@echo "Removing production deployment..."
+	$(KUBECTL) delete -f $(K8S_DIR)/services/ --ignore-not-found
+	$(KUBECTL) delete -f $(K8S_DIR)/infra/ --ignore-not-found
+	$(KUBECTL) delete -f $(K8S_DIR)/secrets/ --ignore-not-found
+	@echo "Deleting go-app namespace..."
+	kubectl delete namespace go-app --ignore-not-found
+	@echo "Stopping minikube..."
+	minikube stop --profile=$(MINIKUBE_PROFILE)
+
+production-restart:
+	@echo "Restarting application deployments..."
+	$(KUBECTL) rollout restart deployment/auth deployment/email deployment/email-api deployment/broadcasting
+
+production-ps:
+	@echo "Production pod status:"
+	$(KUBECTL) get pods -o wide
+
+production-logs:
+	@echo "Viewing auth logs (Ctrl-C to stop)..."
+	$(KUBECTL) logs -f deployment/auth
+
+production-migrate:
+	@echo "Running migrations for auth..."
+	$(KUBECTL) exec deployment/auth -- ./bin/migrate
+	@echo "Running migrations for email..."
+	$(KUBECTL) exec deployment/email -- ./bin/migrate
+
+production-init: production-setup production-build production-up production-migrate
+
+production-tunnel:
+	@echo "Starting minikube tunnel (keep this terminal open)..."
+	minikube tunnel --profile=$(MINIKUBE_PROFILE)
+
+production-url:
+	@echo "Run 'make production-tunnel' in a separate terminal, then access:"
+	@echo "  http://localhost/api/auth/api/health"

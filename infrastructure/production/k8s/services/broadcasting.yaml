@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broadcasting
+  namespace: go-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broadcasting
+  template:
+    metadata:
+      labels:
+        app: broadcasting
+    spec:
+      containers:
+        - name: broadcasting
+          image: broadcasting:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - secretRef:
+                name: broadcasting-secret
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broadcasting
+  namespace: go-app
+spec:
+  selector:
+    app: broadcasting
+  ports:
+    - port: 8082
+      targetPort: 8082

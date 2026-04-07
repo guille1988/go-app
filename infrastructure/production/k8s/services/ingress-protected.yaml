@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-app-ingress-protected
+  namespace: go-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://auth.go-app.svc.cluster.local:8080/api/auth/validate"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-User-UUID"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api/ws
+            pathType: Prefix
+            backend:
+              service:
+                name: broadcasting
+                port:
+                  number: 8082

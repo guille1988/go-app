@@ -15,3 +15,10 @@ spec:
                 name: auth
                 port:
                   number: 8080
+          - path: /api/stress
+            pathType: Prefix
+            backend:
+              service:
+                name: auth
+                port:
+                  number: 8080

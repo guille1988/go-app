@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-stress
+  namespace: go-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: k6
+          image: grafana/k6:latest
+          args: ["run", "-o", "experimental-prometheus-rw", "/scripts/stress.js"]
+          env:
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://prometheus:9090/api/v1/write
+          volumeMounts:
+            - name: k6-script
+              mountPath: /scripts
+      volumes:
+        - name: k6-script
+          configMap:
+            name: k6-stress-script
+      restartPolicy: Never
+  backoffLimit: 0

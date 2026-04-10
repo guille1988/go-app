@@ -12,7 +12,7 @@ K8S_DIR          = infrastructure/production/k8s
 	init update clean compile compile-all \
 	production-setup production-build production-up production-down production-restart \
 	production-ps production-logs production-test production-migrate \
-    production-init production-url
+    production-init production-url production-stress
 
 help:
 	@echo "Available commands:"
@@ -127,6 +127,19 @@ production-setup:
 		--for=condition=ready pod \
 		--selector=app.kubernetes.io/component=controller \
 		--timeout=120s
+	@echo "Enabling metrics-server addon..."
+	minikube addons enable metrics-server --profile=$(MINIKUBE_PROFILE)
+	kubectl wait --namespace kube-system \
+		--for=condition=ready pod \
+		--selector=k8s-app=metrics-server \
+		--timeout=60s
+	@echo "Exposing ingress metrics port..."
+	kubectl apply -f infrastructure/production/k8s/ingress-metrics-svc.yaml
+	@echo "Enabling ingress controller metrics..."
+	kubectl -n ingress-nginx patch deployment ingress-nginx-controller \
+		--type=json \
+		-p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-metrics=true"}]'
+	kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=60s
 
 production-build:
 	@echo "Building production images inside minikube daemon..."
@@ -171,6 +184,18 @@ production-migrate:
 	@echo "Running migrations for email..."
 	$(KUBECTL) exec deployment/email -- ./bin/migrate
 
+production-stress:
+	@echo "Deploying k6 stress job..."
+	$(KUBECTL) delete job k6-stress --ignore-not-found
+	$(KUBECTL) create configmap k6-stress-script \
+		--from-file=stress.js=infrastructure/production/k6/stress.js \
+		--dry-run=client -o yaml | $(KUBECTL) apply -f -
+	$(KUBECTL) apply -f $(K8S_DIR)/k6/job.yaml
+	@echo "Waiting for k6 job to complete..."
+	$(KUBECTL) wait --for=condition=complete job/k6-stress --timeout=120s
+	@echo "k6 results:"
+	$(KUBECTL) logs job/k6-stress
+
 production-init: production-setup production-build production-up production-migrate
 
 production-tunnel:
@@ -180,3 +205,4 @@ production-tunnel:
 production-url:
 	@echo "Run 'make production-tunnel' in a separate terminal, then access:"
 	@echo "  http://localhost/api/auth/api/health"
+

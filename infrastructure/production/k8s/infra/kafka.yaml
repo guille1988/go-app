@@ -35,27 +35,42 @@ spec:
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "true"
             - name: KAFKA_NUM_PARTITIONS
-              value: "10"
+              value: "50"
             - name: KAFKA_NUM_NETWORK_THREADS
-              value: "8"
-            - name: KAFKA_NUM_IO_THREADS
               value: "16"
+            - name: KAFKA_NUM_IO_THREADS
+              value: "32"
             - name: KAFKA_SOCKET_SEND_BUFFER_BYTES
-              value: "1048576"
+              value: "4194304"
             - name: KAFKA_SOCKET_RECEIVE_BUFFER_BYTES
-              value: "1048576"
+              value: "4194304"
+            - name: KAFKA_LOG_FLUSH_INTERVAL_MESSAGES
+              value: "100000"
+            - name: KAFKA_LOG_FLUSH_INTERVAL_MS
+              value: "1000"
             - name: KAFKA_LOG_RETENTION_MS
               value: "120000"
             - name: KAFKA_LOG_SEGMENT_BYTES
               value: "104857600"
             - name: KAFKA_CLUSTER_ID
               value: "q1Sh8sEGKs2p10e6oNJklw"
+            - name: CLUSTER_ID
+              value: "q1Sh8sEGKs2p10e6oNJklw"
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: "1"
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
               value: "1"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
               value: "1"
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "4000m"
+              memory: "4Gi"
           ports:
             - containerPort: 9092
           livenessProbe:
@@ -65,8 +80,10 @@ spec:
                 - --bootstrap-server
                 - localhost:9092
                 - --list
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data

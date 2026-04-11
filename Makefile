@@ -140,6 +140,10 @@ production-setup:
 		--type=json \
 		-p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-metrics=true"}]'
 	kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=60s
+	@echo "Tuning NGINX ingress for high throughput..."
+	kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
+		--type merge \
+		-p '{"data":{"worker-processes":"auto","keep-alive":"75","keep-alive-requests":"10000","upstream-keepalive-connections":"200","upstream-keepalive-requests":"10000"}}'
 
 production-build:
 	@echo "Building production images inside minikube daemon..."
@@ -153,8 +157,15 @@ production-up:
 	$(KUBECTL) apply -f $(K8S_DIR)/secrets/
 	$(KUBECTL) apply -f $(K8S_DIR)/infra/
 	$(KUBECTL) apply -f $(K8S_DIR)/services/
-	@echo "Waiting for pods to be ready..."
-	$(KUBECTL) wait --for=condition=ready pod --all --timeout=180s
+	@echo "Waiting for infra pods (mysql, kafka, redis)..."
+	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-auth --timeout=180s
+	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-email --timeout=180s
+	$(KUBECTL) wait --for=condition=ready pod -l app=kafka --timeout=180s
+	$(KUBECTL) wait --for=condition=ready pod -l app=redis --timeout=180s
+	@echo "Restarting app services after infra is ready..."
+	$(KUBECTL) rollout restart deployment/auth deployment/email deployment/broadcasting
+	$(KUBECTL) rollout status deployment/auth --timeout=120s
+	$(KUBECTL) rollout status deployment/email --timeout=120s
 
 production-down:
 	@echo "Removing production deployment..."
@@ -192,7 +203,7 @@ production-stress:
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	$(KUBECTL) apply -f $(K8S_DIR)/k6/job.yaml
 	@echo "Waiting for k6 job to complete..."
-	$(KUBECTL) wait --for=condition=complete job/k6-stress --timeout=120s
+	$(KUBECTL) wait --for=condition=complete job/k6-stress --timeout=300s
 	@echo "k6 results:"
 	$(KUBECTL) logs job/k6-stress
 

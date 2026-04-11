@@ -5,12 +5,16 @@ export const options = {
   scenarios: {
     constant_load: {
       executor: 'constant-arrival-rate',
-      rate: 10000,
+      rate: 50000,
       timeUnit: '1s',
-      duration: '1m',
-      preAllocatedVUs: 2000,
-      maxVUs: 10000,
+      duration: '2m',
+      preAllocatedVUs: 5000,
+      maxVUs: 30000,
     },
+  },
+  thresholds: {
+    http_req_duration: ['p(95)<500'],
+    http_req_failed: ['rate<0.05'],
   },
 };
 

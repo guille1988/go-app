@@ -10,6 +10,13 @@ spec:
         - name: k6
           image: grafana/k6:latest
           args: ["run", "-o", "experimental-prometheus-rw", "/scripts/stress.js"]
+          resources:
+            requests:
+              cpu: "2000m"
+              memory: "4Gi"
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
           env:
             - name: K6_PROMETHEUS_RW_SERVER_URL
               value: http://prometheus:9090/api/v1/write

@@ -119,7 +119,7 @@ compile-all: local-compile-all
 
 production-setup:
 	@echo "Starting minikube..."
-	minikube start --profile=$(MINIKUBE_PROFILE) --driver=docker
+	minikube start --profile=$(MINIKUBE_PROFILE) --driver=docker --cpus=12 --memory=49152
 	@echo "Enabling NGINX ingress addon..."
 	minikube addons enable ingress --profile=$(MINIKUBE_PROFILE)
 	@echo "Waiting for ingress controller..."

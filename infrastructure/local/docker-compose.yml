@@ -52,15 +52,12 @@ services:
       AUTH_ACCESS_TOKEN_EXPIRE: ${AUTH_ACCESS_TOKEN_EXPIRE}
       AUTH_REFRESH_TOKEN_EXPIRE: ${AUTH_REFRESH_TOKEN_EXPIRE}
       AUTH_EMAIL_VERIFICATION_EXPIRE: ${AUTH_EMAIL_VERIFICATION_EXPIRE}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
     working_dir: /auth
     depends_on:
       mysql_auth:
         condition: service_healthy
-      rabbitmq:
+      kafka:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
@@ -96,11 +93,7 @@ services:
       LOG_DRIVER: ${EMAIL_LOG_DRIVER}
       LOG_PATH: ${EMAIL_LOG_PATH}
       LOG_LEVEL: ${EMAIL_LOG_LEVEL}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      RABBITMQ_PREFETCH_COUNT: ${EMAIL_RABBITMQ_PREFETCH_COUNT}
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
       MAIL_HOST: ${EMAIL_MAIL_HOST}
       MAIL_PORT: ${EMAIL_MAIL_PORT}
       MAIL_USER: ${EMAIL_MAIL_USER}
@@ -109,40 +102,7 @@ services:
     depends_on:
       mysql_email:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - app-network
-
-  email_api:
-    build:
-      context: ../..
-      dockerfile: infrastructure/local/email_api/Dockerfile
-    image: email_api:latest
-    container_name: email_api
-    volumes:
-      - ../../microservices/email:/email
-    environment:
-      APP_NAME: ${EMAIL_APP_NAME}
-      APP_ENV: ${EMAIL_APP_ENV}
-      APP_HOST: ${EMAIL_APP_HOST}
-      APP_PORT: ${EMAIL_APP_PORT}
-      DB_DRIVER: ${EMAIL_DB_DRIVER}
-      DB_HOST: ${EMAIL_DB_HOST}
-      DB_PORT: ${EMAIL_DB_PORT}
-      DB_DATABASE: ${EMAIL_DB_DATABASE}
-      DB_USERNAME: ${EMAIL_DB_USERNAME}
-      DB_PASSWORD: ${EMAIL_DB_PASSWORD}
-      DB_LOCAL_MAX_IDLE_CONNECTIONS: ${EMAIL_DB_MAX_IDLE_CONNECTIONS}
-      DB_LOCAL_MAX_OPEN_CONNECTIONS: ${EMAIL_DB_MAX_OPEN_CONNECTIONS}
-      LOG_DRIVER: ${EMAIL_LOG_DRIVER}
-      LOG_PATH: ${EMAIL_LOG_PATH}
-      LOG_LEVEL: ${EMAIL_LOG_LEVEL}
-    ports:
-      - "8082:8081"
-    working_dir: /email
-    depends_on:
-      mysql_email:
+      kafka:
         condition: service_healthy
     networks:
       - app-network
@@ -164,14 +124,10 @@ services:
       LOG_DRIVER: ${BROADCASTING_LOG_DRIVER}
       LOG_PATH: ${BROADCASTING_LOG_PATH}
       LOG_LEVEL: ${BROADCASTING_LOG_LEVEL}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      RABBITMQ_PREFETCH_COUNT: ${BROADCASTING_RABBITMQ_PREFETCH_COUNT}
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
     working_dir: /broadcasting
     depends_on:
-      rabbitmq:
+      kafka:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
@@ -237,20 +193,37 @@ services:
     networks:
       - app-network
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
     restart: always
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${KAFKA_PORT}:9092"
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      KAFKA_NODE_ID: "${KAFKA_NODE_ID}"
+      KAFKA_CLUSTER_ID: "${KAFKA_CLUSTER_ID}"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: "${KAFKA_NUM_PARTITIONS}"
+      KAFKA_NUM_NETWORK_THREADS: "8"
+      KAFKA_NUM_IO_THREADS: "16"
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: "1048576"
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: "1048576"
+      KAFKA_LOG_RETENTION_MS: "${KAFKA_LOG_RETENTION_MS}"
+      KAFKA_LOG_SEGMENT_BYTES: "104857600"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 5s
-      retries: 10
+      retries: 15
+      start_period: 20s
     networks:
       - app-network
 

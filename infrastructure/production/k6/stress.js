@@ -3,13 +3,11 @@ import { check } from 'k6';
 
 export const options = {
   scenarios: {
-    constant_load: {
-      executor: 'constant-arrival-rate',
-      rate: 50000,
-      timeUnit: '1s',
-      duration: '2m',
-      preAllocatedVUs: 5000,
-      maxVUs: 30000,
+    burst: {
+      executor: 'shared-iterations',
+      vus: 500,
+      iterations: 50000,
+      maxDuration: '30s',
     },
   },
   thresholds: {

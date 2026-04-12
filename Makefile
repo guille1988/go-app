@@ -158,10 +158,10 @@ production-up:
 	$(KUBECTL) apply -f $(K8S_DIR)/infra/
 	$(KUBECTL) apply -f $(K8S_DIR)/services/
 	@echo "Waiting for infra pods (mysql, kafka, redis)..."
-	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-auth --timeout=180s
-	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-email --timeout=180s
-	$(KUBECTL) wait --for=condition=ready pod -l app=kafka --timeout=180s
-	$(KUBECTL) wait --for=condition=ready pod -l app=redis --timeout=180s
+	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-auth --timeout=600s
+	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-email --timeout=600s
+	$(KUBECTL) wait --for=condition=ready pod -l app=kafka --timeout=600s
+	$(KUBECTL) wait --for=condition=ready pod -l app=redis --timeout=600s
 	@echo "Restarting app services after infra is ready..."
 	$(KUBECTL) rollout restart deployment/auth deployment/email deployment/broadcasting
 	$(KUBECTL) rollout status deployment/auth --timeout=120s

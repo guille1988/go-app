@@ -6,7 +6,7 @@ export const options = {
     burst: {
       executor: 'shared-iterations',
       vus: 500,
-      iterations: 50000,
+      iterations: 500000,
       maxDuration: '30s',
     },
   },

@@ -154,6 +154,7 @@ production-build:
 production-up:
 	@echo "Deploying to minikube..."
 	kubectl apply -f $(K8S_DIR)/namespace.yaml
+	kubectl apply --server-side -f $(K8S_DIR)/keda/keda.yaml
 	$(KUBECTL) apply -f $(K8S_DIR)/secrets/
 	$(KUBECTL) apply -f $(K8S_DIR)/infra/
 	$(KUBECTL) apply -f $(K8S_DIR)/services/
@@ -172,6 +173,8 @@ production-down:
 	$(KUBECTL) delete -f $(K8S_DIR)/services/ --ignore-not-found
 	$(KUBECTL) delete -f $(K8S_DIR)/infra/ --ignore-not-found
 	$(KUBECTL) delete -f $(K8S_DIR)/secrets/ --ignore-not-found
+	kubectl delete -f $(K8S_DIR)/keda/keda.yaml --ignore-not-found
+	kubectl delete namespace keda --ignore-not-found
 	@echo "Deleting go-app namespace..."
 	kubectl delete namespace go-app --ignore-not-found
 	@echo "Stopping minikube..."

@@ -7,7 +7,7 @@ export const options = {
       executor: 'shared-iterations',
       vus: 500,
       iterations: 500000,
-      maxDuration: '30s',
+      maxDuration: '120s',
     },
   },
   thresholds: {

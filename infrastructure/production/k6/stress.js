@@ -6,8 +6,8 @@ export const options = {
     burst: {
       executor: 'shared-iterations',
       vus: 500,
-      iterations: 500000,
-      maxDuration: '120s',
+      iterations: 1000000,
+      maxDuration: '240s',
     },
   },
   thresholds: {

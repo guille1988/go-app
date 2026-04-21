@@ -19,6 +19,12 @@ data:
               names:
                 - go-app
         relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            separator: /
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
           - source_labels: [__meta_kubernetes_pod_container_name]
@@ -74,11 +80,19 @@ spec:
           image: grafana/promtail:latest
           args:
             - -config.file=/etc/promtail/promtail-config.yaml
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: config
               mountPath: /etc/promtail
             - name: varlogpods
               mountPath: /var/log/pods
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
               readOnly: true
       volumes:
         - name: config
@@ -87,3 +101,6 @@ spec:
         - name: varlogpods
           hostPath:
             path: /var/log/pods
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers

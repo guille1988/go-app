@@ -13,6 +13,10 @@ spec:
       labels:
         app: broadcasting
     spec:
+      initContainers:
+        - name: wait-for-kafka
+          image: busybox:latest
+          command: ['sh', '-c', 'until nc -z kafka.go-app.svc.cluster.local 9092; do echo "waiting for kafka"; sleep 2; done; sleep 5']
       containers:
         - name: broadcasting
           image: broadcasting:latest

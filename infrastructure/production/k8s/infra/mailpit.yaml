@@ -16,6 +16,9 @@ spec:
       containers:
         - name: mailpit
           image: axllent/mailpit
+          env:
+            - name: MP_MAX_MESSAGES
+              value: "0"
           ports:
             - containerPort: 1025
             - containerPort: 8025

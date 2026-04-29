@@ -12,7 +12,12 @@ spec:
     metadata:
       labels:
         app: auth
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
+      terminationGracePeriodSeconds: 60
       containers:
         - name: auth
           image: auth:latest
@@ -21,11 +26,11 @@ spec:
             - containerPort: 8080
           resources:
             requests:
-              cpu: "50m"
-              memory: "64Mi"
+              cpu: "500m"
+              memory: "256Mi"
             limits:
-              cpu: "200m"
-              memory: "128Mi"
+              cpu: "2000m"
+              memory: "512Mi"
           envFrom:
             - secretRef:
                 name: auth-secret

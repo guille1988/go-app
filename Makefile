@@ -119,7 +119,7 @@ compile-all: local-compile-all
 
 production-setup:
 	@echo "Starting minikube..."
-	minikube start --profile=$(MINIKUBE_PROFILE) --driver=docker
+	minikube start --profile=$(MINIKUBE_PROFILE) --driver=docker --cpus=12 --memory=49152
 	@echo "Enabling NGINX ingress addon..."
 	minikube addons enable ingress --profile=$(MINIKUBE_PROFILE)
 	@echo "Waiting for ingress controller..."
@@ -140,6 +140,10 @@ production-setup:
 		--type=json \
 		-p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-metrics=true"}]'
 	kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=60s
+	@echo "Tuning NGINX ingress for high throughput..."
+	kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
+		--type merge \
+		-p '{"data":{"worker-processes":"auto","keep-alive":"75","keep-alive-requests":"10000","upstream-keepalive-connections":"200","upstream-keepalive-requests":"10000"}}'
 
 production-build:
 	@echo "Building production images inside minikube daemon..."
@@ -150,17 +154,27 @@ production-build:
 production-up:
 	@echo "Deploying to minikube..."
 	kubectl apply -f $(K8S_DIR)/namespace.yaml
+	kubectl apply --server-side -f $(K8S_DIR)/keda/keda.yaml
 	$(KUBECTL) apply -f $(K8S_DIR)/secrets/
 	$(KUBECTL) apply -f $(K8S_DIR)/infra/
+	@echo "Waiting for infra pods (mysql, kafka, redis)..."
+	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-auth --timeout=600s
+	$(KUBECTL) wait --for=condition=ready pod -l app=mysql-email --timeout=600s
+	$(KUBECTL) wait --for=condition=ready pod -l app=kafka --timeout=600s
+	$(KUBECTL) wait --for=condition=ready pod -l app=redis --timeout=600s
+	@echo "Deploying services after infra is ready..."
 	$(KUBECTL) apply -f $(K8S_DIR)/services/
-	@echo "Waiting for pods to be ready..."
-	$(KUBECTL) wait --for=condition=ready pod --all --timeout=180s
+	$(KUBECTL) rollout restart deployment/auth deployment/email deployment/broadcasting
+	$(KUBECTL) rollout status deployment/auth --timeout=120s
+	$(KUBECTL) rollout status deployment/email --timeout=120s
 
 production-down:
 	@echo "Removing production deployment..."
 	$(KUBECTL) delete -f $(K8S_DIR)/services/ --ignore-not-found
 	$(KUBECTL) delete -f $(K8S_DIR)/infra/ --ignore-not-found
 	$(KUBECTL) delete -f $(K8S_DIR)/secrets/ --ignore-not-found
+	kubectl delete -f $(K8S_DIR)/keda/keda.yaml --ignore-not-found
+	kubectl delete namespace keda --ignore-not-found
 	@echo "Deleting go-app namespace..."
 	kubectl delete namespace go-app --ignore-not-found
 	@echo "Stopping minikube..."
@@ -192,7 +206,7 @@ production-stress:
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	$(KUBECTL) apply -f $(K8S_DIR)/k6/job.yaml
 	@echo "Waiting for k6 job to complete..."
-	$(KUBECTL) wait --for=condition=complete job/k6-stress --timeout=120s
+	$(KUBECTL) wait --for=condition=complete job/k6-stress --timeout=300s
 	@echo "k6 results:"
 	$(KUBECTL) logs job/k6-stress
 

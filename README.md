@@ -6,11 +6,11 @@ A modern, scalable microservices architecture built with **Go 1.25**, focusing o
 
 ### 🧱 Architecture Overview
 
-This project is a distributed system consisting of several specialized microservices that communicate via REST APIs and asynchronous messaging (RabbitMQ).
+This project is a distributed system consisting of several specialized microservices that communicate via REST APIs and asynchronous messaging (Kafka).
 
 *   **[Auth Microservice](./auth)**: Manages user authentication, JWT issuance, and user profiles. Uses Redis for token management.
-*   **[Email Microservice](./email)**: Handles email dispatching. Consumes messages from RabbitMQ to send transactional emails asynchronously.
-*   **Message Broker**: RabbitMQ serves as the central hub for inter-service communication.
+*   **[Email Microservice](./email)**: Handles email dispatching. Consumes messages from Kafka to send transactional emails asynchronously.
+*   **Message Broker**: Kafka serves as the central hub for inter-service communication.
 *   **Database**: Each microservice manages its own database (MySQL/PostgreSQL/SQLite) ensuring data isolation.
 
 ---
@@ -26,7 +26,7 @@ From the root directory, run:
 ```bash
 make up
 ```
-This will start MySQL, Redis, RabbitMQ, Promtail, and all microservices defined in the `docker-compose.yml`.
+This will start MySQL, Redis, Kafka, Promtail, and all microservices defined in the `docker-compose.yml`.
 
 #### 2. Run Database Migrations
 Initialize schemas for all services:
@@ -76,8 +76,8 @@ The project includes a root-level `Makefile` to manage all microservices at once
 
 1.  **User Registration**: Client hits the `Auth` API.
 2.  **User Persisted**: `Auth` service saves user data to its database.
-3.  **Event Published**: `Auth` service publishes a `WelcomeEmail` message to RabbitMQ.
-4.  **Event Consumed**: `Email` service consumes the message from the queue.
+3.  **Event Published**: `Auth` service publishes a `WelcomeEmail` message to the Kafka topic `user.created`.
+4.  **Event Consumed**: `Email` service consumes the message from the topic.
 5.  **Email Sent**: `Email` service renders the template and sends it via SMTP.
 
 ---
@@ -88,7 +88,7 @@ Each service contains its own testing suite. You can run all of them from the ro
 ```bash
 make test
 ```
-The integration tests use **Testcontainers**, ensuring that services are tested against real instances of MySQL, Redis, and RabbitMQ.
+The integration tests use **Testcontainers**, ensuring that services are tested against real instances of MySQL, Redis, and Kafka.
 
 ---
 

@@ -2,6 +2,7 @@ DOCKER_COMPOSE   = docker-compose -f infrastructure/local/docker-compose.yml
 KUBECTL          = kubectl -n go-app
 MINIKUBE_PROFILE = go-app
 K8S_DIR          = infrastructure/production/k8s
+SHARED_SERVICES  = auth email broadcasting
 
 .PHONY: \
 	help \
@@ -10,6 +11,7 @@ K8S_DIR          = infrastructure/production/k8s
 	local-init local-update local-compile local-compile-all \
 	up down restart build ps logs test migrate migrate-fresh seed migrate-seed \
 	init update clean compile compile-all \
+	sync-shared check-shared-drift \
 	production-setup production-build production-up production-down production-restart \
 	production-ps production-logs production-test production-migrate \
     production-init production-url production-stress
@@ -96,6 +98,54 @@ local-compile-all:
 	docker exec email go build -o bin/migrate cmd/migrate/main.go
 	@echo "Compiling broadcasting microservice (consumer)..."
 	docker exec broadcasting go build -o bin/consumer cmd/consumer/main.go
+
+# ── SHARED SUBMODULE (go-app-shared, nested under each service's internal/shared) ──
+
+# check-shared-drift verifies the three services have go-app-shared checked
+# out at the exact same commit. Run it anytime; it's read-only.
+check-shared-drift:
+	@shas=""; \
+	for svc in $(SHARED_SERVICES); do \
+		sha=$$(git -C microservices/$$svc/internal/shared rev-parse HEAD); \
+		echo "  $$svc: $$sha"; \
+		shas="$$shas $$sha"; \
+	done; \
+	unique=$$(echo $$shas | tr ' ' '\n' | sort -u | wc -l | tr -d ' '); \
+	if [ "$$unique" != "1" ]; then \
+		echo "DRIFT DETECTED: go-app-shared is not at the same commit in all services."; \
+		exit 1; \
+	fi; \
+	echo "OK: all services are on the same go-app-shared commit."
+
+# sync-shared pushes a change made in one service's internal/shared checkout
+# (the go-app-shared submodule) to the other two, then bumps the submodule
+# pointer in all three service repos and in this outer repo.
+#
+# Usage: make sync-shared FROM=auth
+sync-shared:
+	@if [ -z "$(FROM)" ]; then \
+		echo "Usage: make sync-shared FROM=<auth|email|broadcasting>"; \
+		exit 1; \
+	fi
+	@echo "==> Pushing shared change from $(FROM)/internal/shared..."
+	cd microservices/$(FROM)/internal/shared && git add . && git commit -m "chore: update shared dtos" && git push origin main
+	@echo "==> Syncing into the other services..."
+	@for svc in $(SHARED_SERVICES); do \
+		if [ "$$svc" != "$(FROM)" ]; then \
+			echo "  - $$svc"; \
+			(cd microservices/$$svc/internal/shared && git checkout -- . && git pull origin main); \
+		fi; \
+	done
+	@echo "==> Bumping the go-app-shared pointer in each service repo..."
+	@for svc in $(SHARED_SERVICES); do \
+		(cd microservices/$$svc && git add internal/shared && git commit -m "chore: bump go-app-shared" && git push origin main); \
+	done
+	@echo "==> Bumping submodule pointers in the main repo..."
+	git add microservices/auth microservices/email microservices/broadcasting
+	git commit -m "chore: bump shared submodule pointers"
+	git push origin main
+	@echo "==> Verifying no drift..."
+	$(MAKE) check-shared-drift
 
 # ── ALIASES (backwards-compatible originals) ─────────────────────────────────
 

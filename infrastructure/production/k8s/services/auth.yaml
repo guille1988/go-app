@@ -24,6 +24,9 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
+              name: http
+            - containerPort: 9090
+              name: grpc
           resources:
             requests:
               cpu: "500m"
@@ -56,5 +59,9 @@ spec:
   selector:
     app: auth
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080
+    - name: grpc
+      port: 9090
+      targetPort: 9090

@@ -33,6 +33,7 @@ services:
       APP_ENV: ${AUTH_APP_ENV}
       APP_HOST: ${AUTH_APP_HOST}
       APP_PORT: ${AUTH_APP_PORT}
+      APP_GRPC_PORT: ${AUTH_APP_GRPC_PORT}
       DB_DRIVER: ${AUTH_DB_DRIVER}
       DB_HOST: ${AUTH_DB_HOST}
       DB_PORT: ${AUTH_DB_PORT}
@@ -129,6 +130,9 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS}
       KAFKA_REBALANCE_TIMEOUT_MS: ${BROADCASTING_KAFKA_REBALANCE_TIMEOUT_MS}
       KAFKA_WORKER_POOL_SIZE: ${BROADCASTING_KAFKA_WORKER_POOL_SIZE}
+      AUTH_GRPC_ADDRESS: ${BROADCASTING_AUTH_GRPC_ADDRESS}
+      TOKEN_REVALIDATION_INTERVAL_MINUTES: ${BROADCASTING_TOKEN_REVALIDATION_INTERVAL_MINUTES}
+      TOKEN_REVALIDATION_TIMEOUT_SECONDS: ${BROADCASTING_TOKEN_REVALIDATION_TIMEOUT_SECONDS}
     working_dir: /broadcasting
     depends_on:
       kafka:
@@ -270,6 +274,8 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
     networks:
       - app-network
 

@@ -22,6 +22,6 @@ WORKDIR /auth
 COPY --from=builder /auth/bin/ ./bin/
 COPY --from=builder /auth/internal/infrastructure/database/migrations/ ./internal/infrastructure/database/migrations/
 
-EXPOSE 8080
+EXPOSE 8080 9090
 
 CMD ["./bin/api"]

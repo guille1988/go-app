@@ -11,7 +11,7 @@ SHARED_SERVICES  = auth email broadcasting
 	local-init local-update local-compile local-compile-all \
 	up down restart build ps logs test migrate migrate-fresh seed migrate-seed \
 	init update clean compile compile-all \
-	sync-shared check-shared-drift \
+	sync-shared check-shared-drift proto \
 	production-setup production-build production-up production-down production-restart \
 	production-ps production-logs production-test production-migrate \
     production-init production-url production-stress
@@ -100,6 +100,20 @@ local-compile-all:
 	docker exec broadcasting go build -o bin/consumer cmd/consumer/main.go
 
 # ── SHARED SUBMODULE (go-app-shared, nested under each service's internal/shared) ──
+
+# proto regenerates the gRPC code from the .proto contracts in go-app-shared.
+# It runs protoc inside docker (pinned plugin versions, no host install) against
+# auth's checkout of the shared submodule; propagate with `make sync-shared FROM=auth`.
+proto:
+	@echo "Generating gRPC code from proto contracts..."
+	docker run --rm -v $(PWD)/microservices/auth/internal/shared:/shared -w /shared golang:1.25-alpine sh -c "\
+		apk add --no-cache protobuf >/dev/null && \
+		go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11 && \
+		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1 && \
+		PATH=\$$PATH:/root/go/bin protoc \
+			--go_out=. --go_opt=paths=source_relative \
+			--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+			rpc/auth/v1/*.proto"
 
 # check-shared-drift verifies the three services have go-app-shared checked
 # out at the exact same commit. Run it anytime; it's read-only.

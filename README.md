@@ -20,10 +20,10 @@ The system models a real-world user lifecycle — registration, authentication, 
                          │                         │
                          ▼                         ▼
                   ┌─────────────┐          ┌───────────────┐
-                  │    auth     │          │  broadcasting │
-                  │ (Gin API)   │          │ (consumer+WS) │
-                  │ MySQL+Redis │          │  in-memory    │
-                  └──────┬──────┘          └───────┬───────┘
+                  │    auth     │◀──gRPC───│  broadcasting │
+                  │ (Gin API)   │ :9090    │ (consumer+WS) │
+                  │ MySQL+Redis │ validate │  in-memory    │
+                  └──────┬──────┘  token   └───────┬───────┘
                          │ publishes to Kafka       ▲
               ┌──────────┼───────────────────────────┘
               ▼          ▼ consumes
@@ -41,12 +41,12 @@ The system models a real-world user lifecycle — registration, authentication, 
 
 | Service | Role | Storage | Protocol |
 |---|---|---|---|
-| **[auth](./microservices/auth)** | Registration, login, JWT issuance, refresh rotation, email verification | MySQL + Redis | HTTP (Gin) → Kafka producer |
+| **[auth](./microservices/auth)** | Registration, login, JWT issuance, refresh rotation, email verification, session-aware token validation | MySQL + Redis | HTTP (Gin) + gRPC server → Kafka producer |
 | **[email](./microservices/email)** | Sends transactional email asynchronously | MySQL | Kafka consumer → SMTP |
-| **[broadcasting](./microservices/broadcasting)** | Pushes real-time notifications to connected clients | In-memory (WebSocket hub) | Kafka consumer → WebSocket |
-| **[go-app-shared](https://github.com/guille1988/go-app-shared)** | Versioned contract of Kafka DTOs and routing keys, checked out as a git submodule at `internal/shared` inside each service | — | — |
+| **[broadcasting](./microservices/broadcasting)** | Pushes real-time notifications to connected clients, revalidates their tokens periodically | In-memory (WebSocket hub) | Kafka consumer → WebSocket, gRPC client |
+| **[go-app-shared](https://github.com/guille1988/go-app-shared)** | Versioned cross-service contracts — Kafka DTOs/routing keys and gRPC protos (with committed generated code) — checked out as a git submodule at `internal/shared` inside each service | — | — |
 
-**Design principle:** services never call each other directly. All cross-service communication is asynchronous, via Kafka events published from `auth` and consumed independently by `email` and `broadcasting`. This means `email` and `broadcasting` can go down, restart, or be scaled independently without `auth` ever noticing — the only coupling between services is the shape of the event, defined once in `go-app-shared`. The one synchronous coupling in the whole system is at the gateway layer, not between services — see [Infrastructure Architecture](#infrastructure-architecture) below.
+**Design principle:** state changes flow asynchronously. All events travel via Kafka, published from `auth` and consumed independently by `email` and `broadcasting` — so those consumers can go down, restart, or scale without `auth` ever noticing, and the only coupling is the shape of the event, defined once in `go-app-shared`. The system has exactly **two synchronous couplings**, both deliberate and both *queries*, never commands: the gateway's forward-auth call at the WebSocket handshake (a gateway-level concern, see [Infrastructure Architecture](#infrastructure-architecture)), and `broadcasting`'s periodic gRPC call asking `auth` "is this token still valid?" — which fails open by design, so an `auth` outage degrades token revalidation instead of dropping live connections. The gRPC contract lives in `go-app-shared` under `rpc/<owning-service>/<version>/`, the same compile-time-safety idea as the Kafka DTOs.
 
 ---
 
@@ -64,7 +64,13 @@ The system models a real-world user lifecycle — registration, authentication, 
 3. `auth` publishes a `UserLoggedIn` event (with the user's UUID) to topic `user.logged_in`.
 4. `broadcasting` consumes it and pushes a notification **only to that user's own WebSocket connections** via `Hub.SendToUser(uuid, ...)` — not a blind broadcast to every connected client.
 
-**3. Load testing (both flows, on demand)**
+**3. Logout → WebSocket Revocation**
+1. Client calls `DELETE /api/auth/logout`; `auth` deletes the refresh session and removes it from the per-user session index in Redis.
+2. Every N minutes, `broadcasting`'s revalidation job asks `auth` over gRPC (`AuthService/ValidateToken`) whether each open connection's token is still valid — a check that is session-aware, not just JWT-aware.
+3. Once the user has no live sessions left, their connections are closed with application close code `4401` and reason `REVOKED` — within one job tick of the logout, even though the JWT itself is still cryptographically valid. Expired tokens close the same way with reason `EXPIRED`.
+4. If `auth` is unreachable, the job **fails open**: connections are kept and re-checked on the next tick — an infrastructure outage never mass-disconnects users.
+
+**4. Load testing (both flows, on demand)**
 Both `auth` and `email` expose a `/api/stress` endpoint that publishes synthetic load onto a dedicated `stress.test` topic, driving the same consumer/producer code paths used in production. See [Load Testing & Autoscaling](#load-testing--autoscaling).
 
 ---
@@ -180,19 +186,22 @@ Using `auth` as the example, adding `POST /api/auth/password-reset` end to end:
 
 No existing file is modified except the one `Register` method — this is the same guarantee the Module Pattern gives at the service level, applied at the endpoint level.
 
-### Testing Tree Mirrors the Domain Tree
+### Testing Tree Mirrors the Source Tree
 
-Integration tests are organized **by domain module**, not by technical layer — `tests/integration/<module>/` exists for each entry in `internal/domain/`:
+Tests never live next to the implementation — everything is under `tests/`, split by kind:
+
+- **`tests/integration/<module>/`** is organized **by domain module**, not by technical layer — one package for each entry in `internal/domain/`. Each test package spins up its own Testcontainers-backed dependencies (MySQL/Redis/Kafka) via a shared `setup.go`, exercising the module through its real HTTP routes or Kafka consumer — black-box integration tests, not unit tests mocking the repository.
+- **`tests/unit/`** mirrors the `internal/` tree exactly (`tests/unit/domain/auth/grpc/` tests `internal/domain/auth/grpc/`, and so on) — black-box unit tests against each package's exported API, with hand-written fakes instead of a mock framework.
 
 ```
-internal/domain/          tests/integration/
-├── auth/          ──▶    ├── auth/
-├── user/          ──▶    ├── users/
+internal/domain/          tests/integration/         internal/                tests/unit/
+├── auth/          ──▶    ├── auth/                  ├── domain/...    ──▶    ├── domain/...
+├── user/          ──▶    ├── users/                 └── infrastructure/ ─▶   └── infrastructure/...
 ├── health/        ──▶    ├── health/
 └── stress/        ──▶    └── stress/
 ```
 
-Each test package spins up its own Testcontainers-backed dependencies (MySQL/Redis/Kafka) via a shared `setup.go`, exercising the module through its real HTTP routes or Kafka consumer — these are black-box integration tests, not unit tests mocking the repository.
+Because `make test` runs `go test ./tests/...`, both kinds run on every invocation.
 
 ---
 
@@ -280,12 +289,16 @@ The `/api/stress` endpoints on `auth`/`email` and the k6 script (`infrastructure
 
 ## Shared Contract: `go-app-shared`
 
-DTOs and Kafka routing keys are **not duplicated by hand** across services — they live in a single versioned module, [`go-app-shared`](https://github.com/guille1988/go-app-shared), checked out identically as a git submodule at `<service>/internal/shared` in all three services. This is what lets `auth` change the shape of `WelcomeEmail` and have `email` fail to compile instead of silently breaking at runtime on a JSON mismatch.
+Cross-service contracts are **not duplicated by hand** across services — they live in a single versioned module, [`go-app-shared`](https://github.com/guille1988/go-app-shared), checked out identically as a git submodule at `<service>/internal/shared` in all three services. It holds two kinds of contract:
 
-The Makefile enforces this contract stays in sync:
+- **Kafka events** (`messaging/kafka/`): the DTOs and routing keys. This is what lets `auth` change the shape of `WelcomeEmail` and have `email` fail to compile instead of silently breaking at runtime on a JSON mismatch.
+- **gRPC APIs** (`rpc/<owning-service>/<version>/`): the `.proto` definitions plus their committed generated code, so consumers build without needing protoc. Versioned packages (`auth.v1`) mean a future breaking change ships as `v2` alongside `v1` instead of forcing a lockstep deploy.
+
+The Makefile enforces this contract stays in sync and regenerates the gRPC code:
 ```bash
 make check-shared-drift        # read-only: fails if the 3 services point to different commits
 make sync-shared FROM=auth     # propagates a change made in one service to the other two
+make proto                     # regenerates gRPC code from the .proto files (protoc in docker, pinned versions)
 ```
 
 ---
@@ -297,6 +310,7 @@ make sync-shared FROM=auth     # propagates a change made in one service to the 
 | Language | Go 1.25 |
 | HTTP framework | [Gin](https://github.com/gin-gonic/gin) |
 | Messaging | [Kafka](https://kafka.apache.org/) via [`twmb/franz-go`](https://github.com/twmb/franz-go) |
+| Internal RPC | [gRPC](https://grpc.io/) (`auth` serves, `broadcasting` calls; contract in `go-app-shared`) |
 | ORM | [GORM](https://gorm.io/) (MySQL, PostgreSQL, or SQLite per environment) |
 | Cache / sessions | [Redis](https://redis.io/) (`go-redis/v9`) |
 | WebSockets | [Gorilla WebSocket](https://github.com/gorilla/websocket) |

@@ -280,7 +280,7 @@ The `/api/stress` endpoints on `auth`/`email` and the k6 script (`infrastructure
 
 ### Observability Pipeline
 
-- **Metrics**: every service exposes `/metrics` (Prometheus format). Prometheus scrapes it directly; `kube-state-metrics` additionally exposes cluster-level object state (pod restarts, deployment replica counts) for the same Grafana dashboards.
+- **Metrics**: every service exposes `/metrics` (Prometheus format), including a `grpc_requests_total{method,code}` counter on both ends of the `auth`↔`broadcasting` gRPC call (server-side interceptor in `auth`, client-side in `broadcasting`). Prometheus scrapes it directly; `kube-state-metrics` additionally exposes cluster-level object state (pod restarts, deployment replica counts) for the same Grafana dashboards.
 - **Logs**: structured (`slog`) container logs are shipped by **Promtail** into **Loki** — identical pipeline in both Docker Compose and Kubernetes, just running as a container vs. a DaemonSet-style deployment.
 - **Dashboards**: **Grafana** is the single pane of glass over both Prometheus (metrics) and Loki (logs).
 - **Health**: every service exposes `/api/health` for liveness checks (used by Kubernetes readiness/liveness probes in production).

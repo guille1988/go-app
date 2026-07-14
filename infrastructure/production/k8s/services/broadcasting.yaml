@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: broadcasting
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8082"
+        prometheus.io/path: "/metrics"
     spec:
       initContainers:
         - name: wait-for-kafka
